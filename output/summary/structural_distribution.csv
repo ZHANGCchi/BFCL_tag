@@ -1,0 +1,6 @@
+﻿structural_label,dialogue_type,count
+<无工具调用>,Multi-Turn,542
+<多工具多调用>,Multi-Turn,136
+<多工具单调用>,Multi-Turn,682
+<单工具多调用>,Multi-Turn,12
+<多工具单调用>,Single-Turn,1
