@@ -4,45 +4,60 @@
 
 ## 算法概览
 
-1. **全局对话类型判定**  
-   - 扫描 `messages` 列表统计 `role == "user"` 的数量。  
+1. **全局对话类型判定**
+   - 扫描 `messages` 列表统计 `role == "user"` 的数量。
    - 若数量 ≤ 1，标记 `dialogue_type = "Single-Turn"`；否则标记为 `"Multi-Turn"`。
 
-2. **Turn 拆分**  
-   - 以 `role == "user"` 的消息为锚点，将完整 `messages` 列表拆分成多个 Turn。  
-   - 每个 Turn 至少包含一条用户消息，并保留其后的 assistant/tool 回复。  
-   - 对于非典型对话（例如缺少用户输入），算法会将现有消息聚合成单一 Turn，保证后续流程可执行。
+2. **Turn 拆分**
+   - 以 `role == "user"` 的消息为锚点，将完整 `messages` 列表拆分成多个 Turn。
+   - 每个 Turn 至少包含一条用户消息，并保留其后的 assistant/tool 回复。
+   - 处理特殊情况：
+     - 如果在第一个用户消息之前有非用户消息（如system消息），这些消息会被添加到第一个Turn中
+     - 如果对话中完全没有用户消息，所有消息会被聚合成单一Turn
+     - 每遇到一个新的用户消息，就会开始一个新的Turn
 
-3. **结构化打标**  
-   - 针对 Turn 内所有 `role == "assistant"` 的消息，收集其中的 `tool_calls`。  
-   - 统计总调用数 `total_calls` 与不同函数名数量 `unique_tool_count`。  
-   - 根据规则输出以下标签之一：
-     - `<无工具调用>`
-     - `<单工具单调用>`
-     - `<多工具单调用>`
-     - `<单工具多调用>`
-     - `<多工具多调用>`  
-   - 同时写入辅助统计信息（调用数、去重后的工具名等），便于后续分析。
+3. **结构化打标**
+   - 针对 Turn 内所有 `role == "assistant"` 的消息，收集其中的 `tool_calls`。
+   - 支持两种tool_calls格式：
+     - 标准格式：`{"function": {"name": "function_name", ...}}`
+     - 简化格式：`{"name": "function_name", ...}`
+   - 统计总调用数 `total_calls` 与不同函数名数量 `unique_tool_count`，以及可用工具总数 `available_tool_count`。
+   - 根据以下规则输出标签：
+     - `total_calls == 0`：`<无工具调用>`
+     - `total_calls == 1` 且 `available_tool_count > 1`：`<多工具单调用>`
+     - `total_calls == 1` 且 `available_tool_count <= 1`：`<单工具单调用>`
+     - `total_calls > 1` 且 `unique_tool_count == 1`：`<单工具多调用>`
+     - `total_calls > 1` 且 `unique_tool_count > 1`：`<多工具多调用>`
+   - 同时写入辅助统计信息（调用数、去重后的工具名、可用工具总数等），便于后续分析。
 
-4. **语义化打标**  
+4. **语义化打标**
    - 寻找 Turn 内最后一条 `role == "assistant"` 的消息。
-   - 若该消息仍是 `tool_calls`，跳过语义标签。  
-   - 否则，将目标回复文本发送至 LLM（通过 `qwen3.py`）。  
+   - 跳过语义标签的条件：
+     - 该消息包含 `tool_calls`（即仍然是工具调用）
+     - 该消息的 `content` 字段不存在、不是字符串类型、或为空字符串
+     - Turn 中没有找到任何 assistant 消息
+   - 否则，将目标回复文本发送至 LLM（通过 `qwen3.py`）。
    - LLM 仅需返回布尔值：
-     - `missing_parameters`: 是否缺少必要参数。
-     - `missing_tools`: 是否缺少可用工具。
+     - `missing_parameters`: 是否缺少必要参数（助手机器人明确表示缺少所需的输入、字段、参数等）
+     - `missing_tools`: 是否缺少可用工具（助手机器人明确表示可用工具集中缺少所需功能）
    - 根据全局 `dialogue_type` 转换为最终标签：
-     - `Multi-Turn`：`<缺少相关参数>`、`<缺少所需工具>`、`<Base>`。
-     - `Single-Turn`：`<幻觉：缺少相关参数>`、`<幻觉：缺少所需工具>`、或不打标。
+     - `Multi-Turn`：
+       - `missing_parameters=True`：`<缺少相关参数>`
+       - `missing_tools=True`：`<缺少所需工具>`
+       - 否则：`<Base>`
+     - `Single-Turn`：
+       - `missing_parameters=True`：`<幻觉：缺少相关参数>`
+       - `missing_tools=True`：`<幻觉：缺少所需工具>`
+       - 否则：不打标（返回None）
 
-5. **结果写回**  
+5. **结果写回**
    - 在每条数据中追加：
      - `dialogue_type`
      - `turn_labels`（Turn 索引、结构标签、语义标签及统计信息）。
    - 输出文件与输入 `.jsonl` 同名，存放在指定的输出目录。
 
-6. **分布可视化**  
-   - `scripts/plot_distribution.py` 读取标注结果，统计结构与语义标签的分布，并按 `dialogue_type` 分组。  
+6. **分布可视化**
+   - `scripts/plot_distribution.py` 读取标注结果，统计结构与语义标签的分布，并按 `dialogue_type` 分组。
    - 生成柱状图（PNG）与对应的 CSV 汇总，便于报告和质量分析。
 
 ## 项目结构
