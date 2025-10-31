@@ -24,7 +24,7 @@ class Qwen3:
                  timeout: float = 60.0,
                  max_retries: int = 2):
         self.base_url = (base_url or os.getenv('QWEN_BASE_URL') or 'http://10.210.1.23:10000/v1').rstrip('/')
-        self.model = model or os.getenv('QWEN_MODEL') or 'Qwen3-14B'
+        self.model = model or os.getenv('QWEN_MODEL') or 'Qwen3-32B'
         self.api_key = api_key or os.getenv('OPENAI_API_KEY') or 'empty'
         # 允许通过环境变量覆盖默认超时与重试次数
         try:
@@ -56,7 +56,7 @@ class Qwen3:
                 'role': 'user',
                 'content': prompt,
             }],
-            'max_tokens': 32768,
+            'max_tokens': 4096,
             'temperature': 0.7,
             'top_p': 0.8,
             'top_k': 20,

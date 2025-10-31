@@ -32,3 +32,9 @@ def ensure_output_dir(path: Path) -> None:
 def list_jsonl_files(folder: Path) -> List[Path]:
     """Return all `.jsonl` files within a directory."""
     return sorted(folder.glob("*.jsonl"))
+
+
+def count_jsonl_rows(path: Path) -> int:
+    """Count non-empty lines in a `.jsonl` file."""
+    with path.open("r", encoding="utf-8") as handle:
+        return sum(1 for line in handle if line.strip())

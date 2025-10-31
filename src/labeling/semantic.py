@@ -51,13 +51,12 @@ class SemanticJudge:
         turn_messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]] | None,
         content: str,
+        context: Dict[str, Any] | None = None,
     ) -> SemanticLLMResult:
         prompt = {
-            "messages": turn_messages,
-            "available_tools": tools or [],
             "assistant_content": content,
         }
-        response = self._client(prompt)
+        response = self._client(prompt, context=context)
         if not isinstance(response, dict):
             raise ValueError("semantic LLM client must return a dict")
         missing_parameters = bool(response.get("missing_parameters"))
@@ -69,6 +68,7 @@ class SemanticJudge:
         turn_messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]] | None,
         dialogue_type: str,
+        context: Dict[str, Any] | None = None,
     ) -> str | None:
         last_assistant = self._find_last_assistant(turn_messages)
         if not last_assistant:
@@ -80,5 +80,5 @@ class SemanticJudge:
         if not isinstance(content, str) or not content.strip():
             return None
 
-        llm_result = self._call_llm(turn_messages, tools, content)
+        llm_result = self._call_llm(turn_messages, tools, content, context=context)
         return llm_result.resolve_label(dialogue_type)

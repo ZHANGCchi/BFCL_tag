@@ -27,7 +27,7 @@
 4. **语义化打标**  
    - 寻找 Turn 内最后一条 `role == "assistant"` 的消息。
    - 若该消息仍是 `tool_calls`，跳过语义标签。  
-   - 否则，将完整 Turn、`tools` 列表以及目标回复文本发送至 LLM（通过 `qwen3.py`）。  
+   - 否则，将目标回复文本发送至 LLM（通过 `qwen3.py`）。  
    - LLM 仅需返回布尔值：
      - `missing_parameters`: 是否缺少必要参数。
      - `missing_tools`: 是否缺少可用工具。
@@ -74,9 +74,14 @@
 
 2. **执行数据标注**
    ```powershell
-   python scripts/label_data.py --data-dir data --output-dir output/labeled
+   python scripts/label_data.py --data-dir data --output-dir output/labeled --max-workers 4 --enable-llm-log
    ```
    - 运行时会调用 `qwen3.py`，请提前配置环境变量 `QWEN_BASE_URL`、`QWEN_MODEL`、`OPENAI_API_KEY`（如需鉴权）。
+   - 默认开启全局及单文件进度条；如果需要禁用单文件进度条，可追加 `--no-turn-progress`。
+   - 可通过 `--max-workers` 控制并发线程数量（缺省值由系统决定）。
+   - `--enable-llm-log` 打开语义判定的日志记录，文件位置可通过 `--llm-log-file` 指定（默认 `logs/semantic_llm.log`），日志中包含每条请求与响应的上下文定位信息，且不会在终端显示。
+      - 语义化判定仅使用最后一条 assistant 自然语言回复作为 LLM 输入，避免冗长上下文导致请求超长。
+   - 命令执行结束后，脚本会展示单个文件及总体的标签统计概览。
 
 3. **生成分布图与汇总**
    ```powershell
