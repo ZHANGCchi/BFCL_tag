@@ -102,7 +102,38 @@
    ```powershell
    python scripts/plot_distribution.py --labeled-dir output/labeled --figure-dir output/figures --summary-dir output/summary
    ```
-   - 输出包括结构标签、语义标签的堆叠柱状图和 CSV。
+    - 输出包括：
+       - 结构标签、语义标签分布（按对话类型堆叠）：
+          - 图：`output/figures/structural_distribution.png`、`output/figures/semantic_distribution.png`
+          - 表：`output/summary/structural_distribution.csv`、`output/summary/semantic_distribution.csv`
+       - 结构×语义 组合分布：
+          - 所有 Turn：
+             - 图：`output/figures/combo_distribution.png`
+             - 表：`output/summary/combo_distribution.csv`
+          - 可用 Turn（可训练的 turn：该 turn 内存在 `assistant` 且 `loss=True`）：
+             - 图：`output/figures/combo_available_distribution.png`
+             - 表：`output/summary/combo_available_distribution.csv`
+       - 汇总：
+          - 文件级汇总：`output/summary/per_file_summary.csv`（新增组合计数字段 `combo_counts`、`combo_available_counts`）
+          - 总体汇总：`output/summary/overall_summary.json`/`overall_summary.csv`（新增 `combo_counts`、`combo_available_counts`）
+
+4. **按标签比例采样训练集**
+   - 准备一个 JSON 配置文件（示例见 `scripts/tag_sampling_config_example.json`），其中可以为结构化与语义标签分别指定目标占比或目标数量。若以占比表示，数值会自动归一化并乘以 `total_samples`。
+   - `total_samples` 表示“希望抽取的 turn 数量”，统计粒度与 `output/labeled/*.jsonl` 中的 `turn_labels` 一致。脚本会先按比例抽取这批 turn 并写入 `output/training/raw/selected.jsonl`，随后再对该 raw 集合执行 OpenAI→SGPT 转换生成最终训练集。
+   - 若某个 turn 在转换阶段因缺少 `reasoning_content` 等信息而无法生成 SGPT 样本，将在采样报告中体现为 `sgpt_selected < raw_selected`。
+   - 当语义标签缺失时，脚本会将其标记为 `"<NO_SEMANTIC>"`，若希望采样到这类样本，请在配置中显式添加该标签。
+   - 执行采样脚本，默认会输出 raw turn 集合、SGPT 训练集、采样报告与（可选）元数据。
+       ```bash
+       python scripts/sample_training_by_tag.py \
+          --config scripts/tag_sampling_config_example.json \
+          --labeled-dir output/labeled \
+        --raw-output-jsonl output/training/raw/selected.jsonl \
+          --output-jsonl output/training/training_dataset.jsonl \
+          --report output/training/sample_report.json \
+          --metadata-output output/training/sample_metadata.jsonl \
+          --total-samples 20000
+       ```
+   - 若资源不足导致目标无法完全满足，可加入 `--allow-shortfall` 继续执行，采样报告会给出每个标签的缺口与可用量统计（`sample_report.json` 的 `selection.raw_selected`/`sgpt_selected` 字段区分 turn 与 SGPT 数量），便于二次调参。
 
 ## 注意事项
 
